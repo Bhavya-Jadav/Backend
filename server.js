@@ -61,6 +61,10 @@ app.get('/', (req, res) => {
 app.use('/api/users', userRoutes);
 app.use('/api/problems', problemRoutes);
 app.use('/problems', problemRoutes); // Recommended for frontend requests; /api/problems for API convention
+app.use('/users', userRoutes);      // Supports /users/login, /users/register, etc.
+app.use('/ideas', ideaRoutes);
+app.use('/quiz', quizRoutes);
+app.use('/files', fileRoutes);
 app.use('/api/ideas', ideaRoutes);
 app.use('/api/quiz', quizRoutes);
 app.use('/api/files', fileRoutes);
