@@ -70,8 +70,10 @@ app.get('/api/test-server', (req, res) => {
   res.json({ message: 'Server test endpoint works!', timestamp: new Date().toISOString() });
 });
 
+
+// --- Listen on all interfaces for Railway ---
 if (require.main === module) {
-  app.listen(PORT, () => {
+  app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Backend server running on port ${PORT}`);
   });
 }
