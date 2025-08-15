@@ -60,6 +60,7 @@ app.get('/', (req, res) => {
 });
 app.use('/api/users', userRoutes);
 app.use('/api/problems', problemRoutes);
+app.use('/problems', problemRoutes); // Recommended for frontend requests; /api/problems for API convention
 app.use('/api/ideas', ideaRoutes);
 app.use('/api/quiz', quizRoutes);
 app.use('/api/files', fileRoutes);
