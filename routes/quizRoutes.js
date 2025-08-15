@@ -47,7 +47,37 @@ router.post('/submit', async (req, res) => {
   const percentScore = totalPoints ? Math.round((score / totalPoints) * 100) : 0;
   const passed = percentScore >= (problem.quiz.passingScore || 70);
 
-  res.json({ success: true, score, percentScore, passed, results });
+  // Save user response
+  try {
+    const QuizResponse = require('../models/QuizResponse');
+    // You may need to get user ID from authentication middleware (e.g., req.user._id)
+    const studentId = req.user?._id || req.body.studentId; // fallback for demo
+    if (!studentId) {
+      return res.status(400).json({ success: false, message: 'Missing student/user ID.' });
+    }
+    // Upsert response (one per student/problem)
+    await QuizResponse.findOneAndUpdate(
+      { problem: problemId, student: studentId },
+      {
+        problem: problemId,
+        student: studentId,
+        answers: results.map((r, idx) => ({
+          questionIndex: idx,
+          answer: answers[idx],
+          isCorrect: r.correct,
+          points: r.correct ? (questions[idx].points || 1) : 0
+        })),
+        totalScore: score,
+        maxScore: totalPoints,
+        percentage: percentScore,
+        passed
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+    res.json({ success: true, score, percentScore, passed, results });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Error saving quiz response', error: err.message });
+  }
 });
 
 
