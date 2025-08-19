@@ -13,20 +13,25 @@ dotenv.config();
 // @access  Public
 router.post('/google-auth', async (req, res) => {
   try {
+    console.log('🔍 Google auth request received:', req.body);
     const { googleId, email, name, picture } = req.body;
 
     if (!googleId || !email) {
+      console.log('❌ Missing required fields:', { googleId: !!googleId, email: !!email });
       return res.status(400).json({ message: 'Google ID and email are required' });
     }
 
+    console.log('🔍 Checking for existing user with Google ID:', googleId);
     // Check if user already exists with this Google ID
     let user = await User.findOne({ googleId });
 
     if (!user) {
+      console.log('🔍 No user found with Google ID, checking email:', email);
       // Check if user exists with this email (for linking accounts)
       user = await User.findOne({ email });
       
       if (user) {
+        console.log('🔍 Linking existing account with Google');
         // Link existing account with Google
         user.googleId = googleId;
         user.googleEmail = email;
@@ -35,7 +40,9 @@ router.post('/google-auth', async (req, res) => {
         user.authMethod = 'google';
         user.profilePicture = picture; // Use Google profile picture
         await user.save();
+        console.log('✅ Account linked successfully');
       } else {
+        console.log('🔍 Creating new user with Google data');
         // Create new user with Google data
         user = new User({
           googleId,
@@ -50,13 +57,18 @@ router.post('/google-auth', async (req, res) => {
           username: `google_${googleId.slice(-8)}` // Generate unique username
         });
         await user.save();
+        console.log('✅ New user created successfully');
       }
+    } else {
+      console.log('✅ Existing Google user found');
     }
 
+    console.log('🔍 Generating JWT token');
     // Generate JWT token
     const token = user.generateToken();
+    console.log('✅ JWT token generated successfully');
 
-    res.json({
+    const response = {
       _id: user._id,
       username: user.username,
       name: user.name,
@@ -73,11 +85,21 @@ router.post('/google-auth', async (req, res) => {
       authMethod: user.authMethod,
       token: token,
       message: 'Google authentication successful'
-    });
+    };
+
+    console.log('✅ Google auth successful, sending response');
+    res.json(response);
 
   } catch (error) {
-    console.error('Google auth error:', error);
-    res.status(500).json({ message: 'Server Error during Google authentication' });
+    console.error('❌ Google auth error details:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
+    res.status(500).json({ 
+      message: 'Server Error during Google authentication',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
   }
 });
 
