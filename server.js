@@ -21,14 +21,17 @@ const PORT = process.env.PORT || 5000;
 // --- Middleware ---
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production' 
-    ? function (origin, callback) {
-        if (!origin) return callback(null, true);
-        if (origin.includes('vercel.app')) {
-          return callback(null, true);
-        }
-        callback(new Error('Not allowed by CORS'));
-      }
-    : ['http://localhost:3000', 'http://127.0.0.1:3000'],
+    ? [
+        process.env.FRONTEND_URL,
+        process.env.VERCEL_URL,
+        'https://esume.vercel.app',
+        'https://*.vercel.app'
+      ].filter(Boolean)
+    : [
+        'http://localhost:3000', 
+        'http://127.0.0.1:3000',
+        process.env.FRONTEND_URL
+      ].filter(Boolean),
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -80,6 +83,7 @@ app.get('/api/test-server', (req, res) => {
 if (require.main === module) {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Backend server running on port ${PORT}`);
+    console.log(`🌐 CORS enabled for: ${corsOptions.origin.join(', ')}`);
   });
 }
 

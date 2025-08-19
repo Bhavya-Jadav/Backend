@@ -8,6 +8,79 @@ const { protect } = require('../middleware/authMiddleware');
 const dotenv = require('dotenv');
 dotenv.config();
 
+// @desc    Google OAuth callback
+// @route   POST /api/users/google-auth
+// @access  Public
+router.post('/google-auth', async (req, res) => {
+  try {
+    const { googleId, email, name, picture } = req.body;
+
+    if (!googleId || !email) {
+      return res.status(400).json({ message: 'Google ID and email are required' });
+    }
+
+    // Check if user already exists with this Google ID
+    let user = await User.findOne({ googleId });
+
+    if (!user) {
+      // Check if user exists with this email (for linking accounts)
+      user = await User.findOne({ email });
+      
+      if (user) {
+        // Link existing account with Google
+        user.googleId = googleId;
+        user.googleEmail = email;
+        user.googleName = name;
+        user.googlePicture = picture;
+        user.authMethod = 'google';
+        user.profilePicture = picture; // Use Google profile picture
+        await user.save();
+      } else {
+        // Create new user with Google data
+        user = new User({
+          googleId,
+          googleEmail: email,
+          googleName: name,
+          googlePicture: picture,
+          email,
+          name,
+          profilePicture: picture,
+          authMethod: 'google',
+          role: 'student', // Default role for Google users
+          username: `google_${googleId.slice(-8)}` // Generate unique username
+        });
+        await user.save();
+      }
+    }
+
+    // Generate JWT token
+    const token = user.generateToken();
+
+    res.json({
+      _id: user._id,
+      username: user.username,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      university: user.university,
+      companyName: user.companyName,
+      profilePicture: user.profilePicture,
+      phone: user.phone,
+      bio: user.bio,
+      course: user.course,
+      year: user.year,
+      skills: user.skills || [],
+      authMethod: user.authMethod,
+      token: token,
+      message: 'Google authentication successful'
+    });
+
+  } catch (error) {
+    console.error('Google auth error:', error);
+    res.status(500).json({ message: 'Server Error during Google authentication' });
+  }
+});
+
 // @desc    Register a new user (Student or Admin signup)
 // @route   POST /api/users/register
 // @access  Public
@@ -45,7 +118,8 @@ router.post('/register', async (req, res) => {
       username,
       password, // Plain text, will be hashed by User model
       role: role || 'student', // Default to student if not provided
-      university: role === 'student' ? university : undefined // Only store for students
+      university: role === 'student' ? university : undefined, // Only store for students
+      authMethod: 'local'
     });
 
     const createdUser = await user.save();
@@ -58,15 +132,14 @@ router.post('/register', async (req, res) => {
       });
       
       // 4. Generate JWT token upon successful creation
-      const token = jwt.sign({ id: createdUser._id }, process.env.JWT_SECRET, {
-        expiresIn: '30d',
-      });
+      const token = createdUser.generateToken();
 
       res.status(201).json({
         _id: createdUser._id,
         username: createdUser.username,
         role: createdUser.role,
         university: createdUser.university,
+        authMethod: createdUser.authMethod,
         token: token,
         message: 'User registered successfully'
       });
@@ -101,7 +174,8 @@ router.post('/login', async (req, res) => {
         id: user._id,
         username: user.username,
         role: user.role,
-        hasPassword: !!user.password
+        hasPassword: !!user.password,
+        authMethod: user.authMethod
       });
     }
 
@@ -109,9 +183,7 @@ router.post('/login', async (req, res) => {
     if (user && (await user.matchPassword(password))) { // Use method from User model
       console.log('🔐 LOGIN DEBUG - Password match: SUCCESS');
       // 3. Generate JWT token
-      const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-        expiresIn: '30d',
-      });
+      const token = user.generateToken();
 
       // 4. Send successful response with complete user data and token
       res.json({
@@ -127,6 +199,7 @@ router.post('/login', async (req, res) => {
         skills: user.skills,
         profilePicture: user.profilePicture,
         role: user.role,
+        authMethod: user.authMethod,
         token: token,
         message: 'Login successful'
       });
@@ -138,6 +211,56 @@ router.post('/login', async (req, res) => {
   } catch (error) {
     console.error('🔐 LOGIN ERROR:', error);
     res.status(500).json({ message: 'Server Error during login' });
+  }
+});
+
+// @desc    Update user profile
+// @route   PUT /api/users/profile
+// @access  Private
+router.put('/profile', protect, async (req, res) => {
+  try {
+    const { name, email, bio, phone, university, course, year, skills } = req.body;
+    
+    const user = await User.findById(req.user.id);
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Update profile fields
+    if (name !== undefined) user.name = name;
+    if (email !== undefined) user.email = email;
+    if (bio !== undefined) user.bio = bio;
+    if (phone !== undefined) user.phone = phone;
+    if (university !== undefined) user.university = university;
+    if (course !== undefined) user.course = course;
+    if (year !== undefined) user.year = year;
+    if (skills !== undefined) user.skills = skills;
+
+    const updatedUser = await user.save();
+
+    res.json({
+      user: {
+        _id: updatedUser._id,
+        username: updatedUser.username,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        phone: updatedUser.phone,
+        bio: updatedUser.bio,
+        university: updatedUser.university,
+        course: updatedUser.course,
+        year: updatedUser.year,
+        skills: updatedUser.skills,
+        profilePicture: updatedUser.profilePicture,
+        role: updatedUser.role,
+        authMethod: updatedUser.authMethod
+      },
+      message: 'Profile updated successfully'
+    });
+
+  } catch (error) {
+    console.error('Profile update error:', error);
+    res.status(500).json({ message: 'Server Error during profile update' });
   }
 });
 
@@ -204,81 +327,6 @@ router.get('/profile', protect, async (req, res) => {
   } catch (error) {
     console.error("Get profile error:", error);
     res.status(500).json({ message: 'Server Error fetching profile' });
-  }
-});
-
-// @desc    Update user profile
-// @route   PUT /api/users/profile
-// @access  Private
-router.put('/profile', protect, async (req, res) => {
-  try {
-    const userId = req.user.id; // From auth middleware
-    const { name, email, bio, phone, university, course, year, skills, profilePicture } = req.body;
-
-    console.log('📝 Profile update request:', {
-      userId,
-      course,
-      skills,
-      skillsLength: skills?.length || 0
-    });
-
-    // Find user and update
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    // Update fields
-    if (name) user.name = name;
-    if (email) user.email = email;
-    if (bio) user.bio = bio;
-    if (phone) user.phone = phone;
-    if (university) user.university = university;
-    if (course) user.course = course;
-    if (year) user.year = year;
-    if (skills) user.skills = skills;
-    
-    // Handle profile picture update
-    if (profilePicture) {
-      // Ensure it's in the correct base64 format
-      if (profilePicture.startsWith('data:image')) {
-        user.profilePicture = profilePicture;
-      } else {
-        // If it's raw base64, add the data URL prefix
-        user.profilePicture = `data:image/jpeg;base64,${profilePicture}`;
-      }
-    }
-
-    const updatedUser = await user.save();
-
-    console.log('✅ Profile updated successfully:', {
-      userId: updatedUser._id,
-      name: updatedUser.name,
-      course: updatedUser.course,
-      skills: updatedUser.skills,
-      skillsLength: updatedUser.skills?.length || 0
-    });
-
-    res.json({
-      message: 'Profile updated successfully',
-      user: {
-        _id: updatedUser._id,
-        username: updatedUser.username,
-        name: updatedUser.name,
-        email: updatedUser.email,
-        bio: updatedUser.bio,
-        phone: updatedUser.phone,
-        university: updatedUser.university,
-        course: updatedUser.course,
-        year: updatedUser.year,
-        skills: updatedUser.skills,
-        role: updatedUser.role,
-        profilePicture: updatedUser.profilePicture
-      }
-    });
-  } catch (error) {
-    console.error('Profile update error:', error);
-    res.status(500).json({ message: 'Server error updating profile' });
   }
 });
 

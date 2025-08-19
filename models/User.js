@@ -3,27 +3,52 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
+
 const userSchema = new mongoose.Schema({
   username: {
     type: String,
-    required: true,
-    unique: true, // Ensure usernames are unique
+    required: function() { return !this.googleId; }, // Required only if not Google user
+    unique: true,
     trim: true
   },
   password: {
     type: String,
-    required: true,
-    minlength: 3 // Enforce minimum password length
+    required: function() { return !this.googleId; }, // Required only if not Google user
+    minlength: 3
+  },
+  // Google OAuth fields
+  googleId: {
+    type: String,
+    unique: true,
+    sparse: true // Allows multiple null values
+  },
+  googleEmail: {
+    type: String,
+    trim: true,
+    lowercase: true
+  },
+  googleName: {
+    type: String,
+    trim: true
+  },
+  googlePicture: {
+    type: String
+  },
+  // Authentication method
+  authMethod: {
+    type: String,
+    enum: ['local', 'google'],
+    default: 'local'
   },
   role: {
     type: String,
     required: true,
-    enum: ['student', 'admin', 'company'], // Added company role
+    enum: ['student', 'admin', 'company'],
     default: 'student'
   },
   university: {
     type: String,
-    required: function() { return this.role === 'student'; } // Required only for students
+    required: function() { return this.role === 'student'; }
   },
   // Extended profile fields
   name: {
@@ -56,7 +81,7 @@ const userSchema = new mongoose.Schema({
     trim: true
   }],
   profilePicture: {
-    type: String, // URL to profile picture
+    type: String,
     default: null
   },
   // Settings
@@ -73,15 +98,14 @@ const userSchema = new mongoose.Schema({
     default: false
   }
 }, {
-  timestamps: true // Automatically adds createdAt and updatedAt fields
+  timestamps: true
 });
 
-// Hash password before saving
+// Hash password before saving (only for local authentication)
 userSchema.pre('save', async function (next) {
-  // Only hash the password if it's new or has been modified
-  if (!this.isModified('password')) return next();
+  // Only hash the password if it's new or has been modified and not a Google user
+  if (!this.isModified('password') || this.authMethod === 'google') return next();
   try {
-    // Salt rounds determine how complex the hash will be (higher = more secure but slower)
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
     next();
@@ -92,7 +116,23 @@ userSchema.pre('save', async function (next) {
 
 // Method to compare entered password with hashed password
 userSchema.methods.matchPassword = async function (enteredPassword) {
+  if (this.authMethod === 'google') return false; // Google users can't use password login
   return await bcrypt.compare(enteredPassword, this.password);
+};
+
+// Method to generate JWT token
+userSchema.methods.generateToken = function() {
+  return jwt.sign(
+    { 
+      id: this._id, 
+      username: this.username, 
+      email: this.email, 
+      role: this.role,
+      authMethod: this.authMethod 
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: '30d' }
+  );
 };
 
 module.exports = mongoose.model('User', userSchema);
