@@ -48,7 +48,9 @@ const userSchema = new mongoose.Schema({
   },
   university: {
     type: String,
-    required: function() { return this.role === 'student'; }
+    required: function() { 
+      return this.role === 'student' && this.authMethod !== 'google'; 
+    }
   },
   // Extended profile fields
   name: {
