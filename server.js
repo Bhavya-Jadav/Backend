@@ -20,21 +20,32 @@ const PORT = process.env.PORT || 5000;
 
 // --- Middleware ---
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'production' 
-    ? [
-        process.env.FRONTEND_URL,
-        process.env.VERCEL_URL,
-        'https://esume.vercel.app',
-        'https://*.vercel.app'
-      ].filter(Boolean)
-    : [
-        'http://localhost:3000', 
-        'http://127.0.0.1:3000',
-        process.env.FRONTEND_URL
-      ].filter(Boolean),
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'https://esume.vercel.app',
+      'https://esume.vercel.app/',
+      process.env.FRONTEND_URL,
+      process.env.VERCEL_URL
+    ].filter(Boolean);
+    
+    console.log('CORS check - Origin:', origin);
+    console.log('CORS check - Allowed origins:', allowedOrigins);
+    
+    if (allowedOrigins.includes(origin) || origin.includes('vercel.app')) {
+      callback(null, true);
+    } else {
+      console.log('CORS blocked origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'Origin', 'Accept']
 };
 
 app.use(cors(corsOptions));
@@ -61,6 +72,25 @@ mongoose.connect(process.env.MONGO_URI, {
 app.get('/', (req, res) => {
   res.send('🚀 EngineerConnect Backend API is running...');
 });
+
+// Debug endpoint to check environment variables
+app.get('/api/debug', (req, res) => {
+  res.json({
+    message: 'Debug info',
+    environment: process.env.NODE_ENV,
+    vercelUrl: process.env.VERCEL_URL,
+    frontendUrl: process.env.FRONTEND_URL,
+    googleClientId: process.env.GOOGLE_CLIENT_ID ? 'Set' : 'Not set',
+    corsOrigins: [
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'https://esume.vercel.app',
+      process.env.FRONTEND_URL,
+      process.env.VERCEL_URL
+    ].filter(Boolean)
+  });
+});
+
 app.use('/api/users', userRoutes);
 app.use('/api/problems', problemRoutes);
 app.use('/problems', problemRoutes); // Recommended for frontend requests; /api/problems for API convention
@@ -83,7 +113,9 @@ app.get('/api/test-server', (req, res) => {
 if (require.main === module) {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Backend server running on port ${PORT}`);
-    console.log(`🌐 CORS enabled for: ${corsOptions.origin.join(', ')}`);
+    console.log(`🌐 CORS enabled for: ${corsOptions.origin}`);
+    console.log(`🔧 Environment: ${process.env.NODE_ENV}`);
+    console.log(`🔧 VERCEL_URL: ${process.env.VERCEL_URL}`);
   });
 }
 
