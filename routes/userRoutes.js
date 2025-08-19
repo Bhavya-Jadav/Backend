@@ -241,7 +241,7 @@ router.post('/login', async (req, res) => {
 // @access  Private
 router.put('/profile', protect, async (req, res) => {
   try {
-    const { name, email, bio, phone, university, course, year, skills } = req.body;
+    const { name, email, bio, phone, university, course, year, skills, role, companyName } = req.body;
     
     const user = await User.findById(req.user.id);
     
@@ -258,6 +258,11 @@ router.put('/profile', protect, async (req, res) => {
     if (course !== undefined) user.course = course;
     if (year !== undefined) user.year = year;
     if (skills !== undefined) user.skills = skills;
+    if (companyName !== undefined) user.companyName = companyName;
+    // Allow role to be set only once, and only student/company
+    if (!user.role && (role === 'student' || role === 'company')) {
+      user.role = role;
+    }
 
     const updatedUser = await user.save();
 
@@ -275,6 +280,7 @@ router.put('/profile', protect, async (req, res) => {
         skills: updatedUser.skills,
         profilePicture: updatedUser.profilePicture,
         role: updatedUser.role,
+        companyName: updatedUser.companyName,
         authMethod: updatedUser.authMethod
       },
       message: 'Profile updated successfully'
