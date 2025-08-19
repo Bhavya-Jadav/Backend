@@ -81,6 +81,7 @@ app.get('/api/debug', (req, res) => {
     vercelUrl: process.env.VERCEL_URL,
     frontendUrl: process.env.FRONTEND_URL,
     googleClientId: process.env.GOOGLE_CLIENT_ID ? 'Set' : 'Not set',
+    jwtSecret: process.env.JWT_SECRET ? 'Set' : 'Not set',
     corsOrigins: [
       'http://localhost:3000',
       'http://127.0.0.1:3000',

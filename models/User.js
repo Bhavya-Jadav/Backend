@@ -122,6 +122,10 @@ userSchema.methods.matchPassword = async function (enteredPassword) {
 
 // Method to generate JWT token
 userSchema.methods.generateToken = function() {
+  if (!process.env.JWT_SECRET) {
+    throw new Error('JWT_SECRET is not configured');
+  }
+  
   return jwt.sign(
     { 
       id: this._id, 
