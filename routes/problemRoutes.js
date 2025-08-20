@@ -52,5 +52,65 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// Update problem (admin/company)
+router.put('/:id', protect, adminOrCompany, async (req, res) => {
+  try {
+    const { company, branch, title, description, videoUrl, difficulty, tags, quiz, attachments } = req.body;
+    
+    const problem = await Problem.findById(req.params.id);
+    if (!problem) {
+      return res.status(404).json({ message: 'Problem not found' });
+    }
+
+    // Check if user has permission to update this problem
+    if (req.user.role !== 'admin' && problem.postedBy.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized to update this problem' });
+    }
+
+    // Update fields
+    if (company !== undefined) problem.company = company;
+    if (branch !== undefined) problem.branch = branch;
+    if (title !== undefined) problem.title = title;
+    if (description !== undefined) problem.description = description;
+    if (videoUrl !== undefined) problem.videoUrl = videoUrl || null;
+    if (difficulty !== undefined) problem.difficulty = difficulty;
+    if (tags !== undefined) {
+      problem.tags = Array.isArray(tags) ? tags : (typeof tags === 'string' ? tags.split(',').map(t => t.trim()).filter(Boolean) : []);
+    }
+    if (quiz !== undefined) problem.quiz = quiz;
+    if (attachments !== undefined) problem.attachments = Array.isArray(attachments) ? attachments : [];
+
+    const updatedProblem = await problem.save();
+    res.json(updatedProblem);
+
+  } catch (err) {
+    if (err.name === 'CastError') {
+      return res.status(404).json({ message: 'Problem not found' });
+    }
+    console.error('Update problem error:', err);
+    res.status(500).json({ message: 'Server Error updating problem' });
+  }
+});
+
+// Delete problem (admin only)
+router.delete('/:id', protect, admin, async (req, res) => {
+  try {
+    const problem = await Problem.findById(req.params.id);
+    if (!problem) {
+      return res.status(404).json({ message: 'Problem not found' });
+    }
+
+    await Problem.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Problem deleted successfully' });
+
+  } catch (err) {
+    if (err.name === 'CastError') {
+      return res.status(404).json({ message: 'Problem not found' });
+    }
+    console.error('Delete problem error:', err);
+    res.status(500).json({ message: 'Server Error deleting problem' });
+  }
+});
+
 module.exports = router;
 
