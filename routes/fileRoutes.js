@@ -118,7 +118,73 @@ router.get('/download/:filename', (req, res) => {
   }
 });
 
-router.get('/health', (_req, res) => res.json({ status: 'ok' }));
+// @desc    Upload file
+// @route   POST /api/files/upload
+// @access  Private
+router.post('/upload', async (req, res) => {
+  try {
+    if (!req.files || !req.files.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+
+    const file = req.files.file;
+    
+    // Basic file validation
+    const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'];
+    if (!allowedTypes.includes(file.mimetype)) {
+      return res.status(400).json({ message: 'Invalid file type. Only PDF, DOC, DOCX, and TXT files are allowed.' });
+    }
+
+    if (file.size > 10 * 1024 * 1024) { // 10MB limit
+      return res.status(400).json({ message: 'File size too large. Please upload a file under 10MB.' });
+    }
+
+    // Generate unique filename
+    const timestamp = Date.now();
+    const randomNum = Math.floor(Math.random() * 1000000000);
+    const fileExtension = path.extname(file.name);
+    const fileName = `attachment-${timestamp}-${randomNum}${fileExtension}`;
+
+    // Create uploads directory if it doesn't exist
+    const uploadsDir = path.join(process.cwd(), 'uploads', 'attachments');
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+
+    // Save file path
+    const filePath = path.join(uploadsDir, fileName);
+
+    // Move file to uploads directory
+    await file.mv(filePath);
+
+    // Return file info
+    res.json({
+      message: 'File uploaded successfully',
+      file: {
+        fileName: fileName,
+        originalName: file.name,
+        fileType: path.extname(file.name).substring(1).toLowerCase(),
+        fileSize: file.size,
+        filePath: filePath,
+        uploadedAt: new Date()
+      }
+    });
+
+  } catch (error) {
+    console.error('File upload error:', error);
+    res.status(500).json({ 
+      message: 'Server error uploading file',
+      error: error.message 
+    });
+  }
+});
+
+router.get('/health', (req, res) => {
+  res.json({ 
+    status: 'File routes working',
+    note: 'Railway uses ephemeral storage - files lost on redeploy',
+    timestamp: new Date().toISOString()
+  });
+});
 
 module.exports = router;
-
