@@ -165,5 +165,19 @@ router.delete('/response/:problemId', protect, async (req, res) => {
   }
 });
 
+// Test endpoint to verify quiz routes are working
+router.get('/health', (req, res) => {
+  res.json({ 
+    status: 'Quiz routes are working',
+    timestamp: new Date().toISOString(),
+    endpoints: [
+      'POST /api/quiz/submit',
+      'GET /api/quiz/response/:problemId',
+      'GET /api/quiz/responses/:problemId',
+      'DELETE /api/quiz/response/:problemId'
+    ]
+  });
+});
+
 module.exports = router;
 

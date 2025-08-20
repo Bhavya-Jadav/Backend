@@ -18,13 +18,15 @@ router.get('/download/:filename', (req, res) => {
     // Security: Prevent directory traversal
     const sanitizedFilename = path.basename(filename);
     
-    // Try multiple possible upload directories
+    // For Railway deployment, files are stored in /tmp or uploads directory
     const possiblePaths = [
       path.join(__dirname, '..', 'uploads', 'attachments', sanitizedFilename),
       path.join(__dirname, '..', '..', 'server', 'uploads', 'attachments', sanitizedFilename),
       path.join(__dirname, '..', '..', 'uploads', 'attachments', sanitizedFilename),
       path.join(process.cwd(), 'uploads', 'attachments', sanitizedFilename),
-      path.join('/tmp', 'uploads', sanitizedFilename)
+      path.join('/tmp', 'uploads', sanitizedFilename),
+      path.join('/app', 'uploads', 'attachments', sanitizedFilename), // Railway path
+      path.join('/opt', 'render', 'project', 'src', 'uploads', 'attachments', sanitizedFilename) // Alternative path
     ];
 
     let filePath = null;
@@ -47,9 +49,24 @@ router.get('/download/:filename', (req, res) => {
     if (!fileExists || !filePath) {
       console.log('File not found:', sanitizedFilename);
       console.log('Searched paths:', possiblePaths);
+      
+      // Log current working directory and list files
+      console.log('Current working directory:', process.cwd());
+      try {
+        const uploadsDir = path.join(process.cwd(), 'uploads');
+        if (fs.existsSync(uploadsDir)) {
+          console.log('Files in uploads directory:', fs.readdirSync(uploadsDir, { recursive: true }));
+        } else {
+          console.log('Uploads directory does not exist');
+        }
+      } catch (err) {
+        console.log('Error listing uploads directory:', err.message);
+      }
+      
       return res.status(404).json({ 
-        message: 'File not found',
-        filename: sanitizedFilename
+        message: 'File not found - files may not persist on Railway deployment',
+        filename: sanitizedFilename,
+        note: 'Files uploaded to Railway are ephemeral and lost on redeploy'
       });
     }
 
