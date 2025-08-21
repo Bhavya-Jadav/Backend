@@ -14,6 +14,7 @@ const problemRoutes = require('./routes/problemRoutes');
 const ideaRoutes = require('./routes/ideaRoutes');
 const quizRoutes = require('./routes/quizRoutes');
 const fileRoutes = require('./routes/fileRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -115,6 +116,7 @@ app.use('/files', fileRoutes);
 app.use('/api/ideas', ideaRoutes);
 app.use('/api/quiz', quizRoutes);
 app.use('/api/files', fileRoutes);
+app.use('/api/admin', adminRoutes);
 app.get('/api/leaderboard', (req, res) => {
   res.redirect('/api/users/leaderboard');
 });
