@@ -235,13 +235,14 @@ router.post('/login', async (req, res) => {
     res.status(500).json({ message: 'Server Error during login' });
   }
 });
-
-// @desc    Update user profile
 // @route   PUT /api/users/profile
 // @access  Private
 router.put('/profile', protect, async (req, res) => {
   try {
-    const { name, email, bio, phone, university, course, year, skills, role, companyName } = req.body;
+    const { 
+      name, email, bio, phone, university, course, year, skills, role, companyName,
+      education, courses, languages, achievements, projects
+    } = req.body;
     
     const user = await User.findById(req.user.id);
     
@@ -259,6 +260,14 @@ router.put('/profile', protect, async (req, res) => {
     if (year !== undefined) user.year = year;
     if (skills !== undefined) user.skills = skills;
     if (companyName !== undefined) user.companyName = companyName;
+    
+    // Update extended resume fields
+    if (education !== undefined) user.education = education;
+    if (courses !== undefined) user.courses = courses;
+    if (languages !== undefined) user.languages = languages;
+    if (achievements !== undefined) user.achievements = achievements;
+    if (projects !== undefined) user.projects = projects;
+    
     // Allow role to be set only once, and only student/company
     if (!user.role && (role === 'student' || role === 'company')) {
       user.role = role;

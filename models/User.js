@@ -79,13 +79,52 @@ const userSchema = new mongoose.Schema({
     trim: true
   },
   skills: [{
-    type: String,
+    type: mongoose.Schema.Types.Mixed, // Allow both strings and objects
     trim: true
   }],
   profilePicture: {
     type: String,
     default: null
   },
+  // Company field
+  companyName: {
+    type: String,
+    trim: true
+  },
+  // Extended resume fields
+  education: [{
+    id: Number,
+    degree: String,
+    institute: String,
+    startDate: String,
+    endDate: String,
+    description: String
+  }],
+  courses: [{
+    id: Number,
+    name: String,
+    provider: String,
+    completionDate: String,
+    certificateLink: String
+  }],
+  languages: [{
+    id: Number,
+    name: String,
+    proficiency: String
+  }],
+  achievements: [{
+    id: Number,
+    title: String,
+    description: String,
+    date: String
+  }],
+  projects: [{
+    id: Number,
+    title: String,
+    description: String,
+    technologies: String,
+    link: String
+  }],
   // Settings
   emailNotifications: {
     type: Boolean,
