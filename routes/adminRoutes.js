@@ -1,11 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
-<<<<<<< HEAD
-=======
 const Problem = require('../models/Problem');
 const Idea = require('../models/Idea');
->>>>>>> 5b98223 (added)
 const { protect, admin } = require('../middleware/authMiddleware');
 
 // Get user statistics for admin dashboard
@@ -160,8 +157,6 @@ router.get('/users/:userId', protect, admin, async (req, res) => {
   }
 });
 
-<<<<<<< HEAD
-=======
 // Get all problems for admin management
 router.get('/problems', protect, admin, async (req, res) => {
   try {
@@ -288,5 +283,4 @@ router.get('/ideas', protect, admin, async (req, res) => {
   }
 });
 
->>>>>>> 5b98223 (added)
 module.exports = router;
