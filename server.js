@@ -39,6 +39,8 @@ const corsOptions = {
       'http://127.0.0.1:3000',
       'https://esume.vercel.app',
       'https://esume.vercel.app/',
+      'https://engineer-connect-app.vercel.app',
+      'https://engineer-connect-app.vercel.app/',
       process.env.FRONTEND_URL,
       process.env.VERCEL_URL
     ].filter(Boolean);
@@ -46,7 +48,8 @@ const corsOptions = {
     console.log('CORS check - Origin:', origin);
     console.log('CORS check - Allowed origins:', allowedOrigins);
     
-    if (allowedOrigins.includes(origin) || origin.includes('vercel.app')) {
+    // Check exact match first, then partial match for vercel.app domains
+    if (allowedOrigins.includes(origin) || (origin && origin.includes('vercel.app'))) {
       callback(null, true);
     } else {
       console.log('CORS blocked origin:', origin);
@@ -55,7 +58,7 @@ const corsOptions = {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Origin', 'Accept']
+  allowedHeaders: ['Content-Type', 'Authorization', 'Origin', 'Accept', 'X-Requested-With']
 };
 
 app.use(cors(corsOptions));
@@ -143,6 +146,7 @@ app.use('/users', userRoutes);
 app.use('/ideas', ideaRoutes);
 app.use('/quiz', quizRoutes);
 app.use('/files', fileRoutes);
+app.use('/admin', adminRoutes); // Add admin routes without /api prefix
 console.log('✅ Registered legacy routes without /api prefix');
 app.get('/api/leaderboard', (req, res) => {
   res.redirect('/api/users/leaderboard');
