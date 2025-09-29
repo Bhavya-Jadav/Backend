@@ -39,6 +39,17 @@ router.get('/', async (_req, res) => {
   }
 });
 
+// Get problems posted by current user (companies see only their problems)
+router.get('/my-problems', protect, async (req, res) => {
+  try {
+    const problems = await Problem.find({ postedBy: req.user._id }).sort({ createdAt: -1 });
+    res.json(problems);
+  } catch (err) {
+    console.error('Fetch my problems error:', err);
+    res.status(500).json({ message: 'Server Error fetching your problems' });
+  }
+});
+
 // Get single problem
 router.get('/:id', async (req, res) => {
   try {
@@ -92,12 +103,17 @@ router.put('/:id', protect, adminOrCompany, async (req, res) => {
   }
 });
 
-// Delete problem (admin only)
-router.delete('/:id', protect, admin, async (req, res) => {
+// Delete problem (admin or problem owner)
+router.delete('/:id', protect, async (req, res) => {
   try {
     const problem = await Problem.findById(req.params.id);
     if (!problem) {
       return res.status(404).json({ message: 'Problem not found' });
+    }
+
+    // Check if user has permission to delete this problem
+    if (req.user.role !== 'admin' && problem.postedBy.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized to delete this problem' });
     }
 
     await Problem.findByIdAndDelete(req.params.id);
