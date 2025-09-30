@@ -15,6 +15,7 @@ const ideaRoutes = require('./routes/ideaRoutes');
 const quizRoutes = require('./routes/quizRoutes');
 const fileRoutes = require('./routes/fileRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const studentProjectRoutes = require('./routes/studentProjectRoutes');
 
 // Debug: Log route imports
 console.log('📁 Route imports:');
@@ -24,6 +25,7 @@ console.log('✅ ideaRoutes loaded:', typeof ideaRoutes);
 console.log('✅ quizRoutes loaded:', typeof quizRoutes);
 console.log('✅ fileRoutes loaded:', typeof fileRoutes);
 console.log('✅ adminRoutes loaded:', typeof adminRoutes);
+console.log('✅ studentProjectRoutes loaded:', typeof studentProjectRoutes);
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -140,6 +142,9 @@ console.log('✅ Registered /api/files');
 app.use('/api/admin', adminRoutes);
 console.log('✅ Registered /api/admin');
 
+app.use('/api/student-projects', studentProjectRoutes);
+console.log('✅ Registered /api/student-projects');
+
 // Legacy routes without /api prefix for backward compatibility
 app.use('/problems', problemRoutes);
 app.use('/users', userRoutes);
@@ -148,6 +153,8 @@ app.use('/quiz', quizRoutes);
 app.use('/files', fileRoutes);
 app.use('/admin', adminRoutes); // Add admin routes without /api prefix
 console.log('✅ Registered legacy routes without /api prefix');
+
+app.use('/student-projects', studentProjectRoutes); // Add student projects without /api prefix
 app.get('/api/leaderboard', (req, res) => {
   res.redirect('/api/users/leaderboard');
 });
