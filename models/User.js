@@ -52,6 +52,10 @@ const userSchema = new mongoose.Schema({
       return this.role === 'student' && this.authMethod !== 'google'; 
     }
   },
+  branch: {
+    type: String,
+    trim: true
+  },
   // Extended profile fields
   name: {
     type: String,
@@ -80,6 +84,10 @@ const userSchema = new mongoose.Schema({
   },
   skills: [{
     type: mongoose.Schema.Types.Mixed, // Allow both strings and objects
+    trim: true
+  }],
+  tags: [{
+    type: String,
     trim: true
   }],
   profilePicture: {

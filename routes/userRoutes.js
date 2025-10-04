@@ -519,4 +519,101 @@ router.delete('/delete-account', protect, async (req, res) => {
   }
 });
 
+// @desc    Search users by various criteria
+// @route   GET /api/users/search
+// @access  Private
+router.get('/search', protect, async (req, res) => {
+  try {
+    const { query, role, limit = 20, page = 1 } = req.query;
+    
+    console.log('🔍 User search request:', { query, role, limit, page });
+    
+    // Build search criteria
+    let searchCriteria = {};
+    
+    // Role filter (if specified)
+    if (role && role !== 'all') {
+      searchCriteria.role = role;
+    }
+    
+    // Text search across multiple fields
+    if (query && query.trim()) {
+      const searchRegex = new RegExp(query.trim(), 'i');
+      
+      searchCriteria.$or = [
+        { username: searchRegex },
+        { name: searchRegex },
+        { email: searchRegex },
+        { university: searchRegex },
+        { course: searchRegex },
+        { branch: searchRegex },
+        { companyName: searchRegex },
+        { bio: searchRegex },
+        { 'skills': { $in: [searchRegex] } },
+        { 'tags': { $in: [searchRegex] } },
+        { 'projects.title': searchRegex },
+        { 'projects.description': searchRegex },
+        { 'projects.technologies': { $in: [searchRegex] } }
+      ];
+    }
+    
+    console.log('🔍 Search criteria:', JSON.stringify(searchCriteria, null, 2));
+    
+    // Calculate pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    // Execute search
+    const users = await User.find(searchCriteria)
+      .select('-password -googleId') // Exclude sensitive fields
+      .limit(parseInt(limit))
+      .skip(skip)
+      .sort({ createdAt: -1 });
+    
+    // Get total count for pagination
+    const totalUsers = await User.countDocuments(searchCriteria);
+    
+    console.log(`🔍 Found ${users.length} users out of ${totalUsers} total`);
+    
+    res.json({
+      users,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(totalUsers / parseInt(limit)),
+        totalUsers,
+        hasMore: skip + users.length < totalUsers
+      }
+    });
+    
+  } catch (error) {
+    console.error('User search error:', error);
+    res.status(500).json({ message: 'Server error during search' });
+  }
+});
+
+// @desc    Get user profile by ID
+// @route   GET /api/users/profile/:userId
+// @access  Private
+router.get('/profile/:userId', protect, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    console.log('🔍 Fetching user profile for ID:', userId);
+    
+    const user = await User.findById(userId)
+      .select('-password -googleId'); // Exclude sensitive fields
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    console.log('✅ User profile found:', user.username);
+    
+    res.json(user);
+    
+  } catch (error) {
+    console.error('Get user profile error:', error);
+    res.status(500).json({ message: 'Server error fetching user profile' });
+  }
+});
+
 module.exports = router;
