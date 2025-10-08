@@ -45,7 +45,11 @@ const Connection = mongoose.models.Connection || mongoose.model('Connection', co
 router.post('/', protect, async (req, res) => {
   try {
     const { recipientId, message } = req.body;
-    const userId = req.user.userId;
+    const userId = req.user._id; // Fix: use _id instead of userId
+
+    console.log('📤 Connection request - Requester:', userId);
+    console.log('📤 Connection request - Recipient:', recipientId);
+    console.log('📤 Connection request - Message:', message);
 
     if (!recipientId) {
       return res.status(400).json({ error: 'Recipient ID is required' });
@@ -87,8 +91,17 @@ router.post('/', protect, async (req, res) => {
       connection
     });
   } catch (error) {
-    console.error('Error sending connection request:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('❌ Error sending connection request:', error);
+    console.error('❌ Error details:', {
+      name: error.name,
+      message: error.message,
+      code: error.code,
+      stack: error.stack
+    });
+    res.status(500).json({ 
+      error: 'Internal server error',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
@@ -96,7 +109,11 @@ router.post('/', protect, async (req, res) => {
 router.put('/', protect, async (req, res) => {
   try {
     const { connectionId, action } = req.body;
-    const userId = req.user.userId;
+    const userId = req.user._id; // Fix: use _id instead of userId
+
+    console.log('🔄 Update connection - User:', userId);
+    console.log('🔄 Update connection - Connection ID:', connectionId);
+    console.log('🔄 Update connection - Action:', action);
 
     if (!connectionId || !action) {
       return res.status(400).json({ error: 'Connection ID and action are required' });
@@ -142,7 +159,10 @@ router.put('/', protect, async (req, res) => {
 router.get('/', protect, async (req, res) => {
   try {
     const { type = 'all' } = req.query;
-    const userId = req.user.userId;
+    const userId = req.user._id; // Fix: use _id instead of userId
+
+    console.log('📋 Get connections - User:', userId);
+    console.log('📋 Get connections - Type:', type);
 
     let query = {};
 
