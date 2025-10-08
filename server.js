@@ -16,6 +16,8 @@ const quizRoutes = require('./routes/quizRoutes');
 const fileRoutes = require('./routes/fileRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const studentProjectRoutes = require('./routes/studentProjectRoutes');
+const connectionRoutes = require('./routes/connectionRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 
 // Debug: Log route imports
 console.log('📁 Route imports:');
@@ -26,6 +28,8 @@ console.log('✅ quizRoutes loaded:', typeof quizRoutes);
 console.log('✅ fileRoutes loaded:', typeof fileRoutes);
 console.log('✅ adminRoutes loaded:', typeof adminRoutes);
 console.log('✅ studentProjectRoutes loaded:', typeof studentProjectRoutes);
+console.log('✅ connectionRoutes loaded:', typeof connectionRoutes);
+console.log('✅ notificationRoutes loaded:', typeof notificationRoutes);
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -144,6 +148,12 @@ console.log('✅ Registered /api/admin');
 
 app.use('/api/student-projects', studentProjectRoutes);
 console.log('✅ Registered /api/student-projects');
+
+app.use('/api/connections', connectionRoutes);
+console.log('✅ Registered /api/connections');
+
+app.use('/api/notifications', notificationRoutes);
+console.log('✅ Registered /api/notifications');
 
 // Legacy routes without /api prefix for backward compatibility
 app.use('/problems', problemRoutes);
