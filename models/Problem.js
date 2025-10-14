@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 
 const problemSchema = new mongoose.Schema({
   company: { type: String, required: true, trim: true },
-  branch: { type: String, required: true, enum: ['computer', 'mechanical', 'electrical', 'civil', 'chemical', 'aerospace'] },
+  branch: { type: String, required: true, enum: ['mechanical', 'computer', 'electrical', 'civil', 'chemical', 'aerospace', 'biomedical', 'industrial', 'electronics', 'it'] },
   title: { type: String, required: true, trim: true },
   description: { type: String, required: true },
   videoUrl: { type: String, default: null },

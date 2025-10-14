@@ -8,9 +8,21 @@ const { protect, admin, adminOrCompany } = require('../middleware/authMiddleware
 router.post('/', protect, adminOrCompany, async (req, res) => {
   try {
     const { company, branch, title, description, videoUrl, difficulty, tags, quiz, attachments } = req.body;
+    
+    console.log('🔍 BACKEND: Received problem data:');
+    console.log('  - company:', company);
+    console.log('  - branch:', branch);
+    console.log('  - title:', title);
+    console.log('  - description:', description ? description.substring(0, 50) + '...' : 'N/A');
+    console.log('  - difficulty:', difficulty);
+    console.log('  - attachments:', attachments);
+    console.log('  - quiz:', quiz);
+    
     if (!company || !branch || !title || !description || !difficulty) {
+      console.log('❌ BACKEND: Missing required fields');
       return res.status(400).json({ message: 'Missing required fields' });
     }
+    
     const problem = new Problem({
       company, branch, title, description,
       videoUrl: videoUrl || null,
@@ -20,11 +32,16 @@ router.post('/', protect, adminOrCompany, async (req, res) => {
       quiz: quiz || { enabled: false, questions: [] },
       attachments: Array.isArray(attachments) ? attachments : []
     });
+    
+    console.log('💾 BACKEND: Attempting to save problem...');
     const created = await problem.save();
+    console.log('✅ BACKEND: Problem saved successfully:', created._id);
     res.status(201).json(created);
   } catch (err) {
-    console.error('Create problem error:', err);
-    res.status(500).json({ message: 'Server Error creating problem' });
+    console.error('❌ BACKEND: Create problem error:', err);
+    console.error('Error details:', err.message);
+    console.error('Error stack:', err.stack);
+    res.status(500).json({ message: 'Server Error creating problem', error: err.message });
   }
 });
 

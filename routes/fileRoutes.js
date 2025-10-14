@@ -45,11 +45,21 @@ router.post('/upload', (req, res) => {
         });
       }
 
+      // Return file metadata in the format expected by frontend
+      const fileMetadata = {
+        fileName: uploadedFile.name,
+        originalName: uploadedFile.name,
+        fileType: uploadedFile.name.split('.').pop()?.toLowerCase() || 'file',
+        fileSize: uploadedFile.size,
+        filePath: `uploads/${uploadedFile.name}`
+      };
+
+      console.log('✅ File uploaded successfully:', fileMetadata);
+
       res.json({
         success: true,
         message: 'File uploaded successfully',
-        filename: uploadedFile.name,
-        path: uploadPath
+        file: fileMetadata  // CompanyDashboard expects 'file' property
       });
     });
 
