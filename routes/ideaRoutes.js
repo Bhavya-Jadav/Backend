@@ -25,22 +25,36 @@ router.post('/', protect, async (req, res) => {
 // Get all ideas (admin only) - Updated to match server folder functionality  
 router.get('/', protect, async (req, res) => {
   try {
-    console.log('🚀 ADMIN IDEAS ROUTE - Getting all ideas');
-    console.log('👤 User:', req.user.username, 'Role:', req.user.role);
+    const { problemId } = req.query;
     
-    // Check if user is admin (allow access for debugging)
-    if (req.user.role !== 'admin') {
-      console.log('⚠️ Non-admin user accessing ideas route - allowing for debugging');
+    console.log('🚀 IDEAS ROUTE - Getting ideas');
+    console.log('👤 User:', req.user.username, 'Role:', req.user.role);
+    console.log('🔍 Problem ID filter:', problemId || 'None (all ideas)');
+    
+    // Build query filter
+    let filter = {};
+    
+    // If problemId is provided, filter by that specific problem
+    if (problemId) {
+      filter.problem = problemId;
+      console.log('🎯 Filtering ideas for specific problem:', problemId);
+    } else {
+      // If no problemId, only admins can see all ideas
+      if (req.user.role !== 'admin') {
+        console.log('⚠️ Non-admin user trying to access all ideas - forbidden');
+        return res.status(403).json({ message: 'Access denied. Only admins can view all ideas.' });
+      }
+      console.log('👑 Admin accessing all ideas');
     }
     
-    // Get all ideas with populated data
-    const ideas = await Idea.find({})
+    // Get ideas with filter
+    const ideas = await Idea.find(filter)
                            .populate('student', 'username name email university course year skills profilePicture')
                            .populate('problem', 'title company branch')
                            .sort({ createdAt: -1 })
                            .lean();
 
-    console.log(`📊 Found ${ideas.length} total ideas in database`);
+    console.log(`📊 Found ${ideas.length} ideas matching filter`);
     
     // Log sample idea for debugging
     if (ideas.length > 0) {
@@ -48,20 +62,27 @@ router.get('/', protect, async (req, res) => {
         id: ideas[0]._id,
         studentName: ideas[0].student?.name,
         problemTitle: ideas[0].problem?.title,
+        company: ideas[0].problem?.company,
         ideaText: ideas[0].ideaText?.substring(0, 50) + '...'
       });
     } else {
-      console.log('📝 No ideas found in database');
+      console.log('📝 No ideas found matching filter');
       
-      // Check if there are any documents in the ideas collection
-      const totalCount = await Idea.countDocuments();
-      console.log('📊 Total idea documents in collection:', totalCount);
+      if (problemId) {
+        // Check if the problem exists
+        const problem = await Problem.findById(problemId);
+        if (!problem) {
+          console.log('❌ Problem not found:', problemId);
+          return res.status(404).json({ message: 'Problem not found' });
+        }
+        console.log('✅ Problem exists but no ideas submitted yet:', problem.title);
+      }
     }
     
     res.json(ideas);
   } catch (error) {
-    console.error("❌ Fetch all ideas error:", error);
-    res.status(500).json({ message: 'Server Error fetching all ideas' });
+    console.error("❌ Fetch ideas error:", error);
+    res.status(500).json({ message: 'Server Error fetching ideas' });
   }
 });
 
