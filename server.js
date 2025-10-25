@@ -3,6 +3,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const fileUpload = require('express-fileupload');
+const path = require('path');
 
 if (process.env.NODE_ENV !== 'production') {
   require('dotenv').config();
@@ -89,6 +90,10 @@ app.use(fileUpload({
   abortOnLimit: true,
   responseOnLimit: "File size limit has been reached"
 }));
+
+// Serve static files from uploads directory
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+console.log('✅ Serving static files from /uploads');
 
 // --- Connect to MongoDB ---
 mongoose.connect(process.env.MONGO_URI, {

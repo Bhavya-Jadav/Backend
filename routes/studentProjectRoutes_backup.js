@@ -1,6 +1,7 @@
 // backend/routes/studentProjectRoutes.js
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const StudentProject = require('../models/StudentProject');
@@ -18,31 +19,141 @@ const filesDir = path.join(uploadsDir, 'files');
   }
 });
 
-// Helper function to save uploaded files
-const saveUploadedFile = async (file, destinationDir) => {
-  const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-  const filename = file.fieldname + '-' + uniqueSuffix + path.extname(file.name);
-  const uploadPath = path.join(destinationDir, filename);
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    // Create different folders for different file types
+    if (file.mimetype.startsWith('video/')) {
+      cb(null, 'uploads/projects/videos/');
+    } else {
+      cb(null, 'uploads/projects/files/');
+    }
+  },
+  filename: function (req, file, cb) {
+    // Generate unique filename
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
 
-  await file.mv(uploadPath);
+// File filter
+const fileFilter = (req, file, cb) => {
+  // Allow videos, images, documents, and code files
+  const allowedTypes = [
+    // Videos
+    'video/mp4', 'video/avi', 'video/mov', 'video/wmv', 'video/webm',
+    // Images  
+    'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',
+    // Documents
+    'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    // Code files
+    'text/plain', 'application/json', 'text/javascript', 'text/html', 'text/css',
+    // Archives
+    'application/zip', 'application/x-rar-compressed', 'application/x-7z-compressed'
+  ];
 
-  return {
-    filename: filename,
-    originalName: file.name,
-    mimetype: file.mimetype,
-    size: file.size
-  };
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Invalid file type. Please upload videos, images, documents, or code files.'), false);
+  }
+};
+
+const upload = multer({ 
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 100 * 1024 * 1024, // 100MB limit
+    files: 11 // Max 11 files total (1 video + 10 attachments)
+  }
+});
+
+// Create a safer upload handler that catches busboy errors
+const safeUpload = upload.fields([
+  { name: 'videoFile', maxCount: 1 },
+  { name: 'attachments', maxCount: 10 }
+]);
+
+// Wrapper to handle upload errors gracefully
+const uploadMiddleware = (req, res, next) => {
+  safeUpload(req, res, (err) => {
+    if (err) {
+      // Log the error but don't fail the request if it's just an empty form
+      console.log('⚠️ Upload middleware error:', err.message);
+      
+      if (err.message === 'Unexpected end of form') {
+        // This is OK - just means no files were uploaded
+        console.log('ℹ️ No files in multipart form, continuing...');
+        return next();
+      }
+      
+      // For other errors, return error response
+      if (err instanceof multer.MulterError) {
+        return res.status(400).json({ 
+          success: false,
+          message: 'File upload error: ' + err.message 
+        });
+      }
+      
+      return res.status(400).json({ 
+        success: false,
+        message: err.message || 'Error uploading files'
+      });
+    }
+    next();
+  });
+};
+
+// Multer error handler middleware
+const handleMulterError = (err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    console.error('Multer error:', err);
+    return res.status(400).json({ 
+      success: false,
+      message: 'File upload error: ' + err.message 
+    });
+  } else if (err) {
+    console.error('Upload error:', err);
+    return res.status(400).json({ 
+      success: false,
+      message: err.message || 'Error uploading files'
+    });
+  }
+  next();
+};
+
+// Optional multer middleware - only use if content-type is multipart
+const optionalUpload = (req, res, next) => {
+  const contentType = req.headers['content-type'] || '';
+  
+  // Only use multer if this is multipart/form-data
+  if (contentType.includes('multipart/form-data')) {
+    upload.fields([
+      { name: 'videoFile', maxCount: 1 },
+      { name: 'attachments', maxCount: 10 }
+    ])(req, res, (err) => {
+      if (err) {
+        return handleMulterError(err, req, res, next);
+      }
+      next();
+    });
+  } else {
+    // Skip multer for non-multipart requests
+    next();
+  }
 };
 
 // Create new student project
-router.post('/', protect, async (req, res) => {
+router.post('/', protect, uploadMiddleware, async (req, res) => {
   try {
     // Only students can create projects
     if (req.user.role !== 'student') {
       return res.status(403).json({ message: 'Only students can create projects' });
     }
 
-    console.log('📝 Creating project - Request body:', Object.keys(req.body));
+    console.log('📝 Creating project - Request body:', JSON.stringify(req.body, null, 2));
     console.log('📎 Files received:', req.files ? Object.keys(req.files) : 'none');
 
     const { 
@@ -106,43 +217,30 @@ router.post('/', protect, async (req, res) => {
       });
     }
 
-    // Process uploaded files using express-fileupload
+    // Process uploaded files
     let videoFileData = null;
     let attachmentsData = [];
 
     if (req.files) {
       // Process video file
-      if (req.files.videoFile) {
-        try {
-          const videoFile = Array.isArray(req.files.videoFile) ? req.files.videoFile[0] : req.files.videoFile;
-          videoFileData = await saveUploadedFile(videoFile, videosDir);
-          console.log('✅ Video file saved:', videoFileData.filename);
-        } catch (error) {
-          console.error('❌ Error saving video file:', error);
-          return res.status(500).json({
-            success: false,
-            message: 'Error saving video file: ' + error.message
-          });
-        }
+      if (req.files.videoFile && req.files.videoFile[0]) {
+        const videoFile = req.files.videoFile[0];
+        videoFileData = {
+          filename: videoFile.filename,
+          originalName: videoFile.originalname,
+          mimetype: videoFile.mimetype,
+          size: videoFile.size
+        };
       }
 
       // Process attachments
       if (req.files.attachments) {
-        try {
-          const attachmentFiles = Array.isArray(req.files.attachments) ? req.files.attachments : [req.files.attachments];
-          
-          for (const file of attachmentFiles) {
-            const fileData = await saveUploadedFile(file, filesDir);
-            attachmentsData.push(fileData);
-          }
-          console.log('✅ Attachments saved:', attachmentsData.length);
-        } catch (error) {
-          console.error('❌ Error saving attachments:', error);
-          return res.status(500).json({
-            success: false,
-            message: 'Error saving attachments: ' + error.message
-          });
-        }
+        attachmentsData = req.files.attachments.map(file => ({
+          filename: file.filename,
+          originalName: file.originalname,
+          mimetype: file.mimetype,
+          size: file.size
+        }));
       }
     }
 
@@ -263,39 +361,6 @@ router.get('/my-projects', protect, async (req, res) => {
   }
 });
 
-// Get showcase projects by user ID (for viewing other users' projects)
-router.get('/user/:userId', async (req, res) => {
-  try {
-    console.log('📊 Fetching showcase projects for user:', req.params.userId);
-    
-    // Check if viewing own profile (if authenticated)
-    const isOwnProfile = req.user && req.user._id.toString() === req.params.userId;
-    
-    // If viewing own profile, show all projects. Otherwise, only public ones
-    const visibilityFilter = isOwnProfile ? {} : { visibility: 'Public' };
-    
-    console.log('Is own profile?', isOwnProfile);
-    console.log('Visibility filter:', visibilityFilter);
-    
-    const projects = await StudentProject.find({ 
-      postedBy: req.params.userId,
-      ...visibilityFilter
-    })
-      .populate('postedBy', 'name username profilePicture')
-      .sort({ createdAt: -1 });
-
-    console.log('✅ Found', projects.length, 'showcase projects for user');
-    if (projects.length > 0) {
-      console.log('First project:', projects[0].title);
-    }
-    
-    res.json(projects);
-  } catch (err) {
-    console.error('❌ Fetch user projects error:', err);
-    res.status(500).json({ message: 'Server Error fetching user projects' });
-  }
-});
-
 // Get single project by ID
 router.get('/:id', async (req, res) => {
   try {
@@ -325,6 +390,83 @@ router.get('/:id', async (req, res) => {
     }
     console.error('Fetch project error:', err);
     res.status(500).json({ message: 'Server Error fetching project' });
+  }
+});
+
+// Update project (only owner)
+router.put('/:id', protect, upload.fields([
+  { name: 'videoFile', maxCount: 1 },
+  { name: 'attachments', maxCount: 10 }
+]), async (req, res) => {
+  try {
+    const project = await StudentProject.findById(req.params.id);
+    
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found' });
+    }
+
+    // Check if user owns the project
+    if (project.postedBy.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized to update this project' });
+    }
+
+    const { 
+      title, description, technologies, learningTags, videoUrl, 
+      githubLink, liveDemo, category, difficulty, duration, 
+      teamSize, collaborators, status, visibility 
+    } = req.body;
+
+    // Update basic fields
+    if (title !== undefined) project.title = title;
+    if (description !== undefined) project.description = description;
+    if (technologies !== undefined) project.technologies = JSON.parse(technologies);
+    if (learningTags !== undefined) project.learningTags = JSON.parse(learningTags);
+    if (videoUrl !== undefined) project.videoUrl = videoUrl || null;
+    if (githubLink !== undefined) project.githubLink = githubLink || null;
+    if (liveDemo !== undefined) project.liveDemo = liveDemo || null;
+    if (category !== undefined) project.category = category;
+    if (difficulty !== undefined) project.difficulty = difficulty;
+    if (duration !== undefined) project.duration = duration || null;
+    if (teamSize !== undefined) project.teamSize = parseInt(teamSize);
+    if (collaborators !== undefined) project.collaborators = JSON.parse(collaborators);
+    if (status !== undefined) project.status = status;
+    if (visibility !== undefined) project.visibility = visibility;
+
+    // Handle file updates
+    if (req.files) {
+      // Update video file
+      if (req.files.videoFile && req.files.videoFile[0]) {
+        const videoFile = req.files.videoFile[0];
+        project.videoFile = {
+          filename: videoFile.filename,
+          originalName: videoFile.originalname,
+          mimetype: videoFile.mimetype,
+          size: videoFile.size
+        };
+      }
+
+      // Update attachments (add new ones)
+      if (req.files.attachments) {
+        const newAttachments = req.files.attachments.map(file => ({
+          filename: file.filename,
+          originalName: file.originalname,
+          mimetype: file.mimetype,
+          size: file.size
+        }));
+        project.attachments = [...project.attachments, ...newAttachments];
+      }
+    }
+
+    const updatedProject = await project.save();
+    await updatedProject.populate('postedBy', 'name username profilePicture');
+
+    res.json(updatedProject);
+  } catch (err) {
+    if (err.name === 'CastError') {
+      return res.status(404).json({ message: 'Project not found' });
+    }
+    console.error('Update project error:', err);
+    res.status(500).json({ message: 'Server Error updating project' });
   }
 });
 
