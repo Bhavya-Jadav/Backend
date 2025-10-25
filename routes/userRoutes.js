@@ -75,14 +75,21 @@ router.post('/google-auth', async (req, res) => {
       email: user.email,
       role: user.role,
       university: user.university,
+      course: user.course,
+      year: user.year,
+      branch: user.branch,
       companyName: user.companyName,
       profilePicture: user.profilePicture,
       phone: user.phone,
       bio: user.bio,
-      course: user.course,
-      year: user.year,
       skills: user.skills || [],
       authMethod: user.authMethod,
+      // Extended resume fields
+      education: user.education || [],
+      courses: user.courses || [],
+      languages: user.languages || [],
+      achievements: user.achievements || [],
+      projects: user.projects || [],
       token: token,
       message: 'Google authentication successful'
     };
@@ -207,7 +214,7 @@ router.post('/login', async (req, res) => {
       // 3. Generate JWT token
       const token = user.generateToken();
 
-      // 4. Send successful response with complete user data and token
+      // 4. Send successful response with complete user data and token (including all extended fields)
       res.json({
         _id: user._id,
         username: user.username,
@@ -218,10 +225,18 @@ router.post('/login', async (req, res) => {
         university: user.university,
         course: user.course,
         year: user.year,
-        skills: user.skills,
+        branch: user.branch,
+        skills: user.skills || [],
         profilePicture: user.profilePicture,
         role: user.role,
+        companyName: user.companyName,
         authMethod: user.authMethod,
+        // Extended resume fields
+        education: user.education || [],
+        courses: user.courses || [],
+        languages: user.languages || [],
+        achievements: user.achievements || [],
+        projects: user.projects || [],
         token: token,
         message: 'Login successful'
       });
@@ -241,8 +256,21 @@ router.put('/profile', protect, async (req, res) => {
   try {
     const { 
       name, email, bio, phone, university, course, year, skills, role, companyName,
-      education, courses, languages, achievements, projects
+      education, courses, languages, achievements, projects, branch
     } = req.body;
+    
+    console.log('📝 PROFILE UPDATE - Received data:', {
+      hasEducation: !!education,
+      hasCourses: !!courses,
+      hasLanguages: !!languages,
+      hasAchievements: !!achievements,
+      hasProjects: !!projects,
+      educationCount: education?.length,
+      coursesCount: courses?.length,
+      languagesCount: languages?.length,
+      achievementsCount: achievements?.length,
+      projectsCount: projects?.length
+    });
     
     const user = await User.findById(req.user.id);
     
@@ -258,15 +286,31 @@ router.put('/profile', protect, async (req, res) => {
     if (university !== undefined) user.university = university;
     if (course !== undefined) user.course = course;
     if (year !== undefined) user.year = year;
+    if (branch !== undefined) user.branch = branch;
     if (skills !== undefined) user.skills = skills;
     if (companyName !== undefined) user.companyName = companyName;
     
     // Update extended resume fields
-    if (education !== undefined) user.education = education;
-    if (courses !== undefined) user.courses = courses;
-    if (languages !== undefined) user.languages = languages;
-    if (achievements !== undefined) user.achievements = achievements;
-    if (projects !== undefined) user.projects = projects;
+    if (education !== undefined) {
+      user.education = education;
+      console.log('✅ Updated education:', education.length, 'entries');
+    }
+    if (courses !== undefined) {
+      user.courses = courses;
+      console.log('✅ Updated courses:', courses.length, 'entries');
+    }
+    if (languages !== undefined) {
+      user.languages = languages;
+      console.log('✅ Updated languages:', languages.length, 'entries');
+    }
+    if (achievements !== undefined) {
+      user.achievements = achievements;
+      console.log('✅ Updated achievements:', achievements.length, 'entries');
+    }
+    if (projects !== undefined) {
+      user.projects = projects;
+      console.log('✅ Updated projects:', projects.length, 'entries');
+    }
     
     // Allow role to be set only once, and only student/company
     if (!user.role && (role === 'student' || role === 'company')) {
@@ -274,7 +318,10 @@ router.put('/profile', protect, async (req, res) => {
     }
 
     const updatedUser = await user.save();
+    
+    console.log('✅ PROFILE UPDATE - Profile saved to database successfully');
 
+    // Return complete user data with all extended fields
     res.json({
       user: {
         _id: updatedUser._id,
@@ -286,11 +333,18 @@ router.put('/profile', protect, async (req, res) => {
         university: updatedUser.university,
         course: updatedUser.course,
         year: updatedUser.year,
-        skills: updatedUser.skills,
+        branch: updatedUser.branch,
+        skills: updatedUser.skills || [],
         profilePicture: updatedUser.profilePicture,
         role: updatedUser.role,
         companyName: updatedUser.companyName,
-        authMethod: updatedUser.authMethod
+        authMethod: updatedUser.authMethod,
+        // Extended resume fields
+        education: updatedUser.education || [],
+        courses: updatedUser.courses || [],
+        languages: updatedUser.languages || [],
+        achievements: updatedUser.achievements || [],
+        projects: updatedUser.projects || []
       },
       message: 'Profile updated successfully'
     });
@@ -347,6 +401,7 @@ router.get('/profile', protect, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    // Return complete user profile with all extended fields
     res.json({
       _id: user._id,
       username: user.username,
@@ -357,9 +412,25 @@ router.get('/profile', protect, async (req, res) => {
       university: user.university,
       course: user.course,
       year: user.year,
-      skills: user.skills,
+      branch: user.branch,
+      skills: user.skills || [],
       profilePicture: user.profilePicture,
-      role: user.role
+      role: user.role,
+      companyName: user.companyName,
+      authMethod: user.authMethod,
+      // Extended resume fields
+      education: user.education || [],
+      courses: user.courses || [],
+      languages: user.languages || [],
+      achievements: user.achievements || [],
+      projects: user.projects || [],
+      // Settings
+      emailNotifications: user.emailNotifications,
+      profileVisibility: user.profileVisibility,
+      darkMode: user.darkMode,
+      // Timestamps
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt
     });
   } catch (error) {
     console.error("Get profile error:", error);
