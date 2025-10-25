@@ -45,8 +45,6 @@ const corsOptions = {
       'http://127.0.0.1:3000',
       'https://esume.vercel.app',
       'https://esume.vercel.app/',
-      'https://skillink.esume.app',
-      'https://skillink.esume.app/',
       'https://engineer-connect-app.vercel.app',
       'https://engineer-connect-app.vercel.app/',
       process.env.FRONTEND_URL,
@@ -121,7 +119,6 @@ app.get('/api/debug', (req, res) => {
       'http://localhost:3000',
       'http://127.0.0.1:3000',
       'https://esume.vercel.app',
-      'https://skillink.esume.app',
       process.env.FRONTEND_URL,
       process.env.VERCEL_URL
     ].filter(Boolean)
