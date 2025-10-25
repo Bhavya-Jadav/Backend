@@ -25,6 +25,12 @@ const studentProjectSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  // NEW: MongoDB File reference for video (stored in File collection)
+  videoFileId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'File'
+  },
+  // OLD: Keep for backward compatibility with existing projects
   videoFile: {
     filename: String,
     originalName: String,
@@ -32,6 +38,12 @@ const studentProjectSchema = new mongoose.Schema({
     size: Number,
     uploadDate: { type: Date, default: Date.now }
   },
+  // NEW: MongoDB File references for attachments (stored in File collection)
+  attachmentIds: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'File'
+  }],
+  // OLD: Keep for backward compatibility with existing projects
   attachments: [{
     filename: String,
     originalName: String,

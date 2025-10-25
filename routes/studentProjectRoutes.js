@@ -4,6 +4,7 @@ const router = express.Router();
 const path = require('path');
 const fs = require('fs');
 const StudentProject = require('../models/StudentProject');
+const File = require('../models/File');
 const { protect } = require('../middleware/authMiddleware');
 
 // Create upload directories if they don't exist
@@ -106,19 +107,43 @@ router.post('/', protect, async (req, res) => {
       });
     }
 
-    // Process uploaded files using express-fileupload
-    let videoFileData = null;
-    let attachmentsData = [];
+    // Process uploaded files and save to MongoDB
+    let videoFileId = null;
+    let attachmentIds = [];
 
     if (req.files) {
-      // Process video file
+      // Process video file - Save to MongoDB
       if (req.files.videoFile) {
         try {
           const videoFile = Array.isArray(req.files.videoFile) ? req.files.videoFile[0] : req.files.videoFile;
-          videoFileData = await saveUploadedFile(videoFile, videosDir);
-          console.log('✅ Video file saved:', videoFileData.filename);
+          
+          // Check file size (MongoDB 16MB limit)
+          if (videoFile.size > 16 * 1024 * 1024) {
+            return res.status(400).json({
+              success: false,
+              message: 'Video file too large. Maximum size is 16MB. Please compress the video.'
+            });
+          }
+          
+          // Convert to Base64 and save to MongoDB
+          const fileData = videoFile.data.toString('base64');
+          
+          const savedVideoFile = await File.create({
+            fileName: `video_${Date.now()}_${videoFile.name}`,
+            originalName: videoFile.name,
+            fileType: videoFile.name.split('.').pop()?.toLowerCase() || 'mp4',
+            fileSize: videoFile.size,
+            mimeType: videoFile.mimetype,
+            fileData: fileData,
+            category: 'video',
+            uploadedBy: req.user._id,
+            visibility: 'public'
+          });
+          
+          videoFileId = savedVideoFile._id;
+          console.log('✅ Video file saved to MongoDB:', savedVideoFile._id);
         } catch (error) {
-          console.error('❌ Error saving video file:', error);
+          console.error('❌ Error saving video file to MongoDB:', error);
           return res.status(500).json({
             success: false,
             message: 'Error saving video file: ' + error.message
@@ -126,18 +151,40 @@ router.post('/', protect, async (req, res) => {
         }
       }
 
-      // Process attachments
+      // Process attachments - Save to MongoDB
       if (req.files.attachments) {
         try {
           const attachmentFiles = Array.isArray(req.files.attachments) ? req.files.attachments : [req.files.attachments];
           
           for (const file of attachmentFiles) {
-            const fileData = await saveUploadedFile(file, filesDir);
-            attachmentsData.push(fileData);
+            // Check file size
+            if (file.size > 16 * 1024 * 1024) {
+              return res.status(400).json({
+                success: false,
+                message: `File "${file.name}" is too large. Maximum size is 16MB.`
+              });
+            }
+            
+            // Convert to Base64 and save to MongoDB
+            const fileData = file.data.toString('base64');
+            
+            const savedFile = await File.create({
+              fileName: `attachment_${Date.now()}_${file.name}`,
+              originalName: file.name,
+              fileType: file.name.split('.').pop()?.toLowerCase() || 'file',
+              fileSize: file.size,
+              mimeType: file.mimetype,
+              fileData: fileData,
+              category: 'document',
+              uploadedBy: req.user._id,
+              visibility: 'public'
+            });
+            
+            attachmentIds.push(savedFile._id);
           }
-          console.log('✅ Attachments saved:', attachmentsData.length);
+          console.log('✅ Attachments saved to MongoDB:', attachmentIds.length);
         } catch (error) {
-          console.error('❌ Error saving attachments:', error);
+          console.error('❌ Error saving attachments to MongoDB:', error);
           return res.status(500).json({
             success: false,
             message: 'Error saving attachments: ' + error.message
@@ -152,8 +199,8 @@ router.post('/', protect, async (req, res) => {
       technologies: techArray,
       learningTags: tagsArray,
       videoUrl: videoUrl || null,
-      videoFile: videoFileData,
-      attachments: attachmentsData,
+      videoFileId: videoFileId, // NEW: MongoDB File reference
+      attachmentIds: attachmentIds, // NEW: MongoDB File references
       githubLink: githubLink || null,
       liveDemo: liveDemo || null,
       category: category || 'Other',
@@ -169,11 +216,11 @@ router.post('/', protect, async (req, res) => {
     const savedProject = await project.save();
     await savedProject.populate('postedBy', 'name username profilePicture');
     
-    console.log('✅ Project created successfully:', savedProject._id);
+    console.log('✅ Project created successfully with MongoDB files:', savedProject._id);
     
     res.status(201).json({
       success: true,
-      message: 'Project created successfully',
+      message: 'Project created successfully with files in MongoDB',
       project: savedProject
     });
   } catch (err) {
@@ -227,6 +274,8 @@ router.get('/', async (req, res) => {
 
     const projects = await StudentProject.find(filter)
       .populate('postedBy', 'name username profilePicture university course year')
+      .populate('videoFileId') // NEW: Populate video file from File collection
+      .populate('attachmentIds') // NEW: Populate attachments from File collection
       .sort(sortOption)
       .skip(skip)
       .limit(limit);
@@ -254,6 +303,8 @@ router.get('/my-projects', protect, async (req, res) => {
   try {
     const projects = await StudentProject.find({ postedBy: req.user._id })
       .populate('postedBy', 'name username profilePicture')
+      .populate('videoFileId') // NEW: Populate video file from File collection
+      .populate('attachmentIds') // NEW: Populate attachments from File collection
       .sort({ createdAt: -1 });
 
     res.json(projects);
@@ -282,6 +333,8 @@ router.get('/user/:userId', async (req, res) => {
       ...visibilityFilter
     })
       .populate('postedBy', 'name username profilePicture')
+      .populate('videoFileId') // NEW: Populate video file from File collection
+      .populate('attachmentIds') // NEW: Populate attachments from File collection
       .sort({ createdAt: -1 });
 
     console.log('✅ Found', projects.length, 'showcase projects for user');
@@ -301,7 +354,9 @@ router.get('/:id', async (req, res) => {
   try {
     const project = await StudentProject.findById(req.params.id)
       .populate('postedBy', 'name username profilePicture university course year')
-      .populate('comments.user', 'name username profilePicture');
+      .populate('comments.user', 'name username profilePicture')
+      .populate('videoFileId') // NEW: Populate video file from File collection
+      .populate('attachmentIds'); // NEW: Populate attachments from File collection
 
     if (!project) {
       return res.status(404).json({ message: 'Project not found' });
